@@ -1,0 +1,19 @@
+```release-note:enhancement
+provider: Add Amazon HealthLake Service
+```
+
+```release-note:enhancement
+resource/aws_healthlake_fhirdatastore: New Resource `aws_healthlake_fhirdatastore`
+```
+
+```release-note:enhancement
+data-source/aws_healthlake_fhirdatastore: New Data Source `aws_healthlake_fhirdatastore`
+```
+
+```release-note:new-resource
+aws_healthlake_fhirdatastore
+```
+
+```release-note:new-data-source
+aws_healthlake_fhirdatastore
+```
