@@ -20,86 +20,81 @@ func resourceAwsHealthLakeFHIRDatastore() *schema.Resource {
 
 		Schema: map[string]*schema.Schema{
 			"created_at": {
-				Type: schema.TypeString,
-				// TODO: if API says "No" is `Required: false`? or since `Required` is default `false` is left out?
+				Type:     schema.TypeString,
 				Computed: true,
 			},
 			"datastore_arn": {
 				Type:     schema.TypeString,
-				Required: true, // TODO: if API says "Yes", then set `Required: true`?
 				Computed: true,
-				// TODO: Pattern validation?
 			},
 			"datastore_endpoint": {
 				Type:     schema.TypeString,
-				Required: true, // API says "Yes"
 				Computed: true,
-				// TODO: Pattern length and validation?
 			},
 			"datastore_id": {
 				Type:     schema.TypeString,
-				Required: true, // API says "Yes"
 				Computed: true,
-				// TODO: Pattern validation?
 			},
 			"datastore_name": {
 				Type:     schema.TypeString,
 				Optional: true,
+				ForceNew: true,
 				ValidateFunc: validation.All(
 					validation.StringLenBetween(1, 256),
+					//TODO: This differs from the console. Open issue with the service team?
 					validation.StringMatch(regexp.MustCompile(`^([\p{L}\p{Z}\p{N}_.:/=+\-%@]*)$`), "Only letters, numbers, separators, or these symbols: underscore '_', period '.', forward slash '/', equals '=', plus '+', minus '-', percentage '%', at sign '@' permitted."),
 				),
 			},
 			"datastore_status": {
 				Type:     schema.TypeString,
-				Required: true, // API says "Yes"
 				Computed: true,
-				// ExactlyOneOf: healthlake.DatastoreStatus_Values(),
 			},
 			"datastore_type_version": {
 				Type:         schema.TypeString,
-				Required:     true, // Can it be optional and required and defaulted?
 				Optional:     true,
-				ExactlyOneOf: healthlake.FHIRVersion_Values(), // Okay to use the AWS SDK Go string arrays? I do not see this pattern anywhere, but why?
-				Default:      healthlake.FHIRVersionR4,        // "R4" if there is only one value, why not default it? Can use the SDK value too?
+				ForceNew:     true,
+				ValidateFunc: validation.StringInSlice(healthlake.FHIRVersion_Values(), false),
+				Default:      healthlake.FHIRVersionR4,
 			},
 			"preload_data_config": {
 				Type:     schema.TypeSet,
-				Required: false, // API says "No"
 				Optional: true,
+				ForceNew: true,
 				MaxItems: 1,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"preload_data_type": {
 							Type:         schema.TypeString,
 							Required:     true,
-							ExactlyOneOf: healthlake.PreloadDataType_Values(), // Okay to use SDK array?
-							Default:      healthlake.PreloadDataTypeSynthea,   // "SYNTHEA" is the only one allowed and use SDK?
+							ForceNew:     true,
+							ValidateFunc: validation.StringInSlice(healthlake.PreloadDataType_Values(), false),
 						},
 					},
 				},
 			},
 			"sse_configuration": {
 				Type:     schema.TypeSet,
-				Required: false, // API says "No"
 				Optional: true,
+				ForceNew: true,
 				MaxItems: 1,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"kms_encryption_config": {
 							Type:     schema.TypeSet,
 							Required: true,
+							ForceNew: true,
 							MaxItems: 1,
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"cmk_type": {
 										Type:         schema.TypeString,
 										Required:     true,
-										ExactlyOneOf: healthlake.CmkType_Values(), // Okay to use the SDK values?
+										ForceNew:     true,
+										ValidateFunc: validation.StringInSlice(healthlake.CmkType_Values(), false),
 									},
 									"kms_key_id": {
 										Type:     schema.TypeString,
-										Required: false, // API Question: How is CmkType required, and not the KmsKeyId???
+										ForceNew: true,
 										ValidateFunc: validation.All(
 											validation.StringLenBetween(1, 400),
 											validation.StringMatch(regexp.MustCompile(`(arn:aws((-us-gov)|(-iso)|(-iso-b)|(-cn))?:kms:)?([a-z]{2}-[a-z]+(-[a-z]+)?-\d:)?(\d{12}:)?(((key/)?[a-zA-Z0-9-_]+)|(alias/[a-zA-Z0-9:/_-]+))`), "Key does not match a 'key' or 'alias' regular expression"),
@@ -111,12 +106,12 @@ func resourceAwsHealthLakeFHIRDatastore() *schema.Resource {
 					},
 				},
 			},
-			"tags": tagsSchema(),
+			"tags": tagsSchemaForceNew(),
 		},
 	}
 }
 
-func resourceAwsHealthLakeFHIRDatasourceCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceHealthLakeFHIRDatasourceCreate(d *schema.ResourceData, meta interface{}) error {
 	// healthlakeconn := meta.(*AWSClient).healthlakeconn
 	return resourceAwsHealthLakeFHIRDatasourceRead(d, meta)
 }
