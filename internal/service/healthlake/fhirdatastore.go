@@ -1,19 +1,30 @@
 package aws
 
 import (
+	"context"
+	"fmt"
 	"regexp"
+	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/healthlake"
+
+	//	"github.com/hashicorp/aws-sdk-go-base/tfawserr"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	//	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/hashicorp/terraform-provider-aws/internal/conns"
+	tftags "github.com/hashicorp/terraform-provider-aws/internal/tags"
 )
 
-func resourceAwsHealthLakeFHIRDatastore() *schema.Resource {
+func ResourceFHIRDatastore() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceAwsHealthLakeFHIRDatasourceCreate,
-		Read:   resourceAwsHealthLakeFHIRDatasourceRead,
+		CreateContext: resourceFHIRDatasourceCreate,
+		ReadContext:   resourceFHIRDatasourceRead,
 		// NOTE: No update in AWS SDK Go for Amazon HealthLake
-		Delete: resourceAwsHealthLakeFHIRDatasourceDelete,
+		DeleteContext: resourceFHIRDatasourceDelete,
 		Importer: &schema.ResourceImporter{
 			State: schema.ImportStatePassthrough,
 		},
@@ -106,22 +117,70 @@ func resourceAwsHealthLakeFHIRDatastore() *schema.Resource {
 					},
 				},
 			},
-			"tags": tagsSchemaForceNew(),
+			"tags": tftags.TagsSchemaForceNew(),
 		},
 	}
 }
 
-func resourceHealthLakeFHIRDatasourceCreate(d *schema.ResourceData, meta interface{}) error {
-	// healthlakeconn := meta.(*AWSClient).healthlakeconn
-	return resourceAwsHealthLakeFHIRDatasourceRead(d, meta)
+func resourceFHIRDatasourceCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	conn := meta.(*conns.AWSClient).HealthLakeConn
+
+	//QUESTION: If there is an optional default, will it be "filled"?
+	input := &healthlake.CreateFHIRDatastoreInput{
+		ClientToken:          aws.String(resource.UniqueId()),
+		DatastoreTypeVersion: aws.String(d.Get("data_type_version").(string)),
+	}
+
+	var err error
+	var resp *healthlake.CreateFHIRDatastoreOutput
+
+	resp, err = conn.CreateFHIRDatastoreWithContext(ctx, input)
+	if err != nil {
+		return diag.FromErr(fmt.Errorf("error creating Amazon HealthLake FHIRDatastore (%s): %w", d.Id(), err))
+	}
+
+	d.SetId(aws.StringValue(resp.DatastoreId))
+	return resourceFHIRDatasourceRead(ctx, d, meta)
 }
 
-func resourceAwsHealthLakeFHIRDatasourceRead(d *schema.ResourceData, meta interface{}) error {
-	// healthlakeconn := meta.(*AWSClient).healthlakeconn
+func resourceFHIRDatasourceRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	conn := meta.(*conns.AWSClient).HealthLakeConn
+	input := &healthlake.DescribeFHIRDatastoreInput{
+		DatastoreId: aws.String(d.Id()),
+	}
+	resp, err := conn.DescribeFHIRDatastoreWithContext(ctx, input)
+
+	//QUESTION: Are there errors that we want to not report failure?
+	// if tfawserr.ErrCodeEquals(err, healthlake.ErrCodeResourceNotFoundException) {
+	// 	//|| tfawserr.ErrMessageContains(err, healthlake.ErrCodeAccessDeniedException, "HealthLake is not enabled")
+	// 	log.Printf("[WARN] Amazon HealthLake FHIRDatastore (%s) not found, removing from state", d.Id())
+	// 	d.SetId("")
+	// 	return nil
+	// }
+	if err != nil {
+		return diag.FromErr(fmt.Errorf("error reading Amazon HealthLake FHIRDatastore (%s): %w", d.Id(), err))
+	}
+
+	d.Set("created_at", resp.DatastoreProperties.CreatedAt.Format(time.RFC3339))
+	d.Set("datastore_arn", resp.DatastoreProperties.DatastoreArn)
+	d.Set("datastore_endpoint", resp.DatastoreProperties.DatastoreEndpoint)
+	d.Set("datastore_id", resp.DatastoreProperties.DatastoreId)
+	d.Set("datastore_name", resp.DatastoreProperties.DatastoreName)
+	d.Set("datastore_status", resp.DatastoreProperties.DatastoreStatus)
+	d.Set("datastore_type_version", resp.DatastoreProperties.DatastoreTypeVersion)
+	//resp.DatastoreProperties.PreloadDataConfig
+	//resp.DatastoreProperties.SseConfiguration
 	return nil
 }
 
-func resourceAwsHealthLakeFHIRDatasourceDelete(d *schema.ResourceData, meta interface{}) error {
-	// healthlakeconn := meta.(*AWSClient).healthlakeconn
+func resourceFHIRDatasourceDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	conn := meta.(*conns.AWSClient).HealthLakeConn
+	input := &healthlake.DeleteFHIRDatastoreInput{
+		DatastoreId: aws.String(d.Id()),
+	}
+	_, err := conn.DeleteFHIRDatastoreWithContext(ctx, input)
+	if err != nil {
+		return diag.FromErr(fmt.Errorf("error deleting Amazon HealthLake FHIRDatastore (%s): %w", d.Id(), err))
+	}
 	return nil
 }
